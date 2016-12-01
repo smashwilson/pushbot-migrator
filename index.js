@@ -18,7 +18,7 @@ class Context {
   }
 
   transfer() {
-    return this.fromBrain.load().then((storage) => toBrain.store(storage))
+    return this.fromBrain.load().then((storage) => this.toBrain.store(storage))
   }
 
   dump() {
