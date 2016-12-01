@@ -24,7 +24,7 @@ class Context {
   dump() {
     return this.fromBrain.load().then((storage) => {
       let processed = {}
-      if (this.limit === undefined) {
+      if (this.limit !== undefined) {
         let count = 0
         for (let type in storage) {
           processed[type] = {}
@@ -36,6 +36,8 @@ class Context {
             count++
             if (count >= this.limit) break
           }
+
+          if (count >= this.limit) break
         }
       } else {
         processed = storage
