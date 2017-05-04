@@ -18,9 +18,11 @@ class ToBrain {
   }
 
   prepare() {
-    let create = "CREATE TABLE IF NOT EXISTS brain ("
-    create += "key TEXT, type TEXT, value JSON DEFAULT '{}'::json, "
-    create += "CONSTRAINT brain_pkey PRIMARY KEY (key, type))"
+    let create = `
+      CREATE TABLE IF NOT EXISTS brain
+      (key TEXT, type TEXT, value JSON DEFAULT '{}'::json,
+      CONSTRAINT brain_pkey PRIMARY KEY (key, type))
+    `
 
     return this.db.none(create)
       .then(() => this.db.none('TRUNCATE TABLE brain RESTART IDENTITY'))
@@ -81,7 +83,7 @@ class ToMarkov {
     let sql0 = `
       CREATE TABLE IF NOT EXISTS ${this.modelName}
       ("from" TEXT, "to" TEXT, frequency INTEGER,
-      CONSTRAINT ${this.modelName}_pkey PRIMARY KEY ("from", "to")
+      CONSTRAINT ${this.modelName}_pkey PRIMARY KEY ("from", "to"))
     `
 
     return this.db.none(sql0)
@@ -92,6 +94,7 @@ class ToMarkov {
       ['from', 'to', 'frequency'],
       {table: this.modelName}
     )
+    const self = this
 
     return Promise.coroutine(function* () {
       let count = 0
