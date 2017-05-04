@@ -1,7 +1,13 @@
 'use strict'
 
+const Promise = require('bluebird')
+const pg = require('pg-promise')({
+  promiseLib: Promise
+})
 const {FromBrain, FromMarkov} = require('./src/from-redis')
-const {ToBrain} = require('./src/to-pg')
+const {FromQuotefile, parseQuote, parseLim} = require('./src/from-quotefile')
+const {ToBrain, ToMarkov} = require('./src/to-pg')
+const path = require('path')
 const util = require('util')
 
 class Context {
@@ -9,16 +15,47 @@ class Context {
   constructor(connections, limit) {
     this.limit = limit
 
+    this.db = pg(connections.pg)
+
     this.fromBrain = new FromBrain(connections.redis)
-    this.toBrain = new ToBrain(connections.pg)
+    this.fromForwardMarkov = new FromMarkov(connections.redis, 'markov')
+    this.fromReverseMarkov = new FromMarkov(connections.redis, 'remarkov')
+
+    this.fromQuoteFile = new FromQuotefile(path.join(__dirname, 'bundle', 'quotes'), /\n\n/, parseQuote)
+    this.fromLimFile = new FromQuotefile(path.join(__dirname, 'bundle', 'lims.txt'), /\n--\n/, parseLim)
+
+    this.toBrain = new ToBrain(this.db)
+    this.toForwardMarkov = new ToMarkov(this.db, 'markov')
+    this.toReverseMarkov = new ToMarkov(this.db, 'remarkov')
   }
 
   prepare() {
-    return this.toBrain.prepare()
+    return Promise.all([
+      this.toBrain.prepare(),
+      this.toForwardMarkov.prepare(),
+      this.toReverseMarkov.prepare(),
+    ])
   }
 
   transfer() {
-    return this.fromBrain.load().then((storage) => this.toBrain.store(storage))
+    const transferBrain = () => {
+      return this.fromBrain.load()
+        .then(storage => this.toBrain.store(storage))
+    }
+
+    const transferMarkovModel = (fromModel, toModel) => {
+      return fromModel.withEachTransitionBatch(5000, batch => toModel.store(batch))
+    }
+
+    const transferForwardModel = transferMarkovModel.bind(this, this.fromForwardMarkov, this.toForwardMarkov)
+
+    const transferReverseModel = transferMarkovModel.bind(this, this.fromReverseMarkov, this.toReverseMarkov)
+
+    return Promise.all([
+      transferBrain(),
+      transferForwardModel(),
+      transferReverseModel(),
+    ])
   }
 
   dump() {
@@ -49,7 +86,7 @@ class Context {
   }
 
   end() {
-    this.toBrain.end()
+    pg.end()
   }
 
 }

@@ -32,8 +32,9 @@ class FromMarkov {
     this.prefix = prefix
   }
 
-  withEachTransition(callback) {
+  withEachTransitionBatch(batchSize, callback) {
     let marker = 0
+    let batch = []
 
     const prefixRx = new RegExp(`^${this.prefix}:`)
 
@@ -47,8 +48,15 @@ class FromMarkov {
       }
       const from = encodedFrom.slice(i)
 
-      return this.client.hgetallAsync(key).then((result) => {
-        Object.keys(result).forEach((to) => callback(from, to, result[to]))
+      return this.client.hgetallAsync(key).then(result => {
+        const transitions = Object.keys(result).map(to => ({from, to, frequency: result[to]}))
+        batch.push(...transitions)
+
+        if (batch.length >= batchSize) {
+          const result = batch.slice();
+          batch = [];
+          callback(result);
+        }
       })
     }
 
@@ -56,6 +64,7 @@ class FromMarkov {
       return this.client.scanAsync(marker, 'match', `${this.prefix}:*`).then(([next, batch]) => {
         marker = next
         return Promise.all(batch.map(transitionsFromKey))
+          .then(() => batch.length > 0 && callback(batch))
       }).then(() => {
         if (marker !== 0) return loop()
       })
