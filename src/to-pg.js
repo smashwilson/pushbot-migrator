@@ -5,7 +5,7 @@ const pg = require('pg-promise')({
   promiseLib: Promise
 })
 
-const BATCH_SIZE = 1000
+const BATCH_SIZE = 5000
 
 class ToBrain {
 
@@ -73,6 +73,7 @@ class ToMarkov {
   constructor(databaseConn, modelName) {
     this.db = databaseConn
     this.modelName = modelName
+    this.count = 0
   }
 
   log(text) {
@@ -97,15 +98,14 @@ class ToMarkov {
     const self = this
 
     return Promise.coroutine(function* () {
-      let count = 0
       let batch = []
 
       for (const {from, to, frequency} of transitions) {
         batch.push({from, to, frequency})
 
         if (batch.length >= BATCH_SIZE) {
-          count += batch.length
-          self.log(`Inserting ${batch.length} rows: ${count}`)
+          self.count += batch.length
+          self.log(`Inserting ${batch.length} rows: ${self.count}`)
           const batchInsert = pg.helpers.insert(batch, cs)
           yield self.db.none(batchInsert)
           batch = []
@@ -114,13 +114,11 @@ class ToMarkov {
 
       // Insert any trailing elements
       if (batch.length > 0) {
-        count += batch.length
-        self.log(`Final batch of ${batch.length} rows: ${count}`)
+        self.count += batch.length
+        self.log(`Inserting ${batch.length} rows: ${self.count}`)
         const batchInsert = pg.helpers.insert(batch, cs)
         yield self.db.none(batchInsert)
       }
-
-      self.log('Complete')
     })()
   }
 }

@@ -64,12 +64,11 @@ class FromMarkov {
       return this.client.scanAsync(marker, 'match', `${this.prefix}:*`).then(([next, batch]) => {
         marker = next
         return Promise.all(batch.map(transitionsFromKey))
-          .then(() => batch.length > 0 && callback(batch))
       }).then(() => {
         if (marker !== 0) return loop()
       })
     }
-    return loop()
+    return loop().then(() => batch.length > 0 && callback(batch))
   }
 
 }
