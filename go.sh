@@ -85,4 +85,4 @@ fi
 
 exec node cli.js \
   --pg postgres://${PG_USER}:${PG_PASS}@${PG_ADDR}:5432/pushbot \
-  --dump
+  --transfer
