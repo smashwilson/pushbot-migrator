@@ -6,7 +6,7 @@ const pg = require('pg-promise')({
 })
 const {FromBrain, FromMarkov} = require('./src/from-redis')
 const {FromQuotefile, parseQuote, parseLim} = require('./src/from-quotefile')
-const {ToBrain, ToMarkov} = require('./src/to-pg')
+const {ToBrain, ToMarkov, ToDocumentSet} = require('./src/to-pg')
 const fs = require('fs')
 const path = require('path')
 const util = require('util')
@@ -17,8 +17,9 @@ const QUOTE = Symbol('quote')
 
 class Context {
 
-  constructor(connections, limit) {
+  constructor(connections, limit, active) {
     this.limit = limit
+    this.active = new Set(active)
 
     this.db = pg(connections.pg)
     this.roster = JSON.parse(fs.readFileSync(path.join(__dirname, 'roster.json')))
@@ -33,6 +34,8 @@ class Context {
     this.toBrain = new ToBrain(this.db)
     this.toForwardMarkov = new ToMarkov(this.db, 'markov')
     this.toReverseMarkov = new ToMarkov(this.db, 'remarkov')
+    this.toQuoteSet = new ToDocumentSet(this.db, 'quote')
+    this.toLimSet = new ToDocumentSet(this.db, 'lim')
   }
 
   isActive(kind) {
@@ -69,13 +72,23 @@ class Context {
 
     const transferReverseModel = transferMarkovModel.bind(this, this.fromReverseMarkov, this.toReverseMarkov)
 
-    return Promise.all([
-      transferBrain(),
+    const transferDocfile = (fromFile, toSet) => {
+      return fromFile.load().then(entries => toSet.store(entries))
+    }
+
+    const transferQuoteFile = transferDocFile.bind(this, this.fromQuotefile, this.toQuoteSet)
+
+    const transferLimFile = transferDocFile.bind(this, this.fromLimFile, this.toLimSet)
+
     const tasks = []
     this.isActive(BRAIN) && tasks.push(transferBrain())
     this.isActive(MARKOV) && tasks.push(
       transferForwardModel(),
       transferReverseModel()
+    )
+    this.isActive(QUOTE) && tasks.push(
+      transferQuoteFile(),
+      transferLimFile()
     )
     return Promise.all(tasks)
   }
@@ -105,8 +118,34 @@ class Context {
       const output = util.inspect(processed)
       console.log(`BRAIN:\n${output}`)
     })
+
+    const dumpQuote = () => {
+      return Promise.all([this.fromQuoteFile.load(), this.fromLimFile.load()])
+      .then(results => {
+        const [quotes, lims] = results;
+        const limited = array => {
+          if (this.limit === undefined) {
+            return array
+          } else {
+            return array.slice(0, this.limit)
+          }
+        }
+
+        console.log('QUOTES:\n')
+        for (const quote of limited(quotes)) {
+          console.log(util.inspect(quote))
+        }
+
+        console.log('LIMS:\n')
+        for (const lim of limited(lims)) {
+          console.log(util.inspect(lim))
+        }
+      })
+    }
+
     let result = Promise.resolve()
     this.isActive(BRAIN) && (result = result.then(dumpBrain))
+    this.isActive(QUOTE) && (result = result.then(dumpQuote))
     return result
   }
 

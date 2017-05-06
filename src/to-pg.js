@@ -123,5 +123,87 @@ class ToMarkov {
   }
 }
 
+class ToDocumentSet {
+
+  constructor(databaseConn, setName) {
+    this.db = databaseConn
+    this.setName = setName;
+    this.documentTable = `${setName}_documents`;
+    this.attributeTable = `${setName}_attributes`;
+  }
+
+  log(text) {
+    console.log(`[DOCUMENTSET ${this.setName}] ${text}`);
+  }
+
+  prepare() {
+    let dtSql = `
+      CREATE TABLE IF NOT EXISTS ${this.documentTable}
+      (id SERIAL PRIMARY KEY,
+      created TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      submitter TEXT,
+      body TEXT NOT NULL)
+    `
+
+    let atSql = `
+      CREATE TABLE IF NOT EXISTS ${this.attributeTable}
+      (id SERIAL PRIMARY KEY,
+      document_id INTEGER REFERENCES ${this.documentTable} ON DELETE CASCADE,
+      kind TEXT NOT NULL,
+      value TEXT NOT NULL)
+    `
+
+    this.dcs = new pg.helpers.ColumnSet(
+      ['submitter', 'body'],
+      {table: this.documentTable}
+    )
+
+    this.acs = new pg.helpers.ColumnSet(
+      ['document_id', 'kind', 'value'],
+      {table: this.attributeTable}
+    )
+
+    return this.db.none(dtSql).then(() => this.db.none(atSql))
+  }
+
+  store(documents) {
+    const bodies = documents.map(document => ({body: document.body, submitter: 'migrated'}))
+    const dIns = pg.helpers.insert(bodies, this.dcs) + 'RETURNING id'
+
+    return this.db.many(dIns).then(ids => {
+      const attributes = []
+      ids.forEach((id, index) => {
+        const document = documents[index]
+        for (const speaker of document.speakers) {
+          attributes.push({
+            document_id: id,
+            kind: 'speaker',
+            value: speaker
+          })
+        }
+        for (const mention of document.mentions) {
+          attributes.push({
+            document_id: id,
+            kind: 'mention',
+            value: mention
+          })
+        }
+        for (const subject of document.subject) {
+          attributes.push({
+            document_id: id,
+            kind: 'subject',
+            value: subject
+          })
+        }
+      })
+
+      const aIns = pg.helpers.insert(attributes, this.acs)
+      return this.db.none(aIns)
+    })
+  }
+}
+
 exports.ToBrain = ToBrain
 exports.ToMarkov = ToMarkov
+exports.ToDocumentSet = ToDocumentSet
