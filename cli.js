@@ -50,5 +50,9 @@ main.initialize({ redis: program.redis, pg: program.pg }, program.limit, active)
     return
   }
 
-  return Promise.all(tasks).finally(() => context.end())
+  return Promise.all(tasks).finally(() => {
+    console.log('done.')
+    context.end()
+    process.exit(0)
+  })
 }).done()

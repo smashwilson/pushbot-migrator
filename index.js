@@ -72,11 +72,11 @@ class Context {
 
     const transferReverseModel = transferMarkovModel.bind(this, this.fromReverseMarkov, this.toReverseMarkov)
 
-    const transferDocfile = (fromFile, toSet) => {
+    const transferDocFile = (fromFile, toSet) => {
       return fromFile.load().then(entries => toSet.store(entries))
     }
 
-    const transferQuoteFile = transferDocFile.bind(this, this.fromQuotefile, this.toQuoteSet)
+    const transferQuoteFile = transferDocFile.bind(this, this.fromQuoteFile, this.toQuoteSet)
 
     const transferLimFile = transferDocFile.bind(this, this.fromLimFile, this.toLimSet)
 

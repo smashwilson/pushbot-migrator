@@ -34,7 +34,7 @@ function parseLim(src, usernames) {
   const usernameRx = new RegExp(usernames.join('|'), 'ig')
   return {
     body: src,
-    speakers: finalLine.match(usernameRx),
+    speakers: finalLine.match(usernameRx) || [],
     mentions: [],
     subjects: []
   }
@@ -55,9 +55,6 @@ class FromQuotefile {
       return contents.split(this.separator)
         .filter(quote => quote.length > 1)
         .map(src => this.parser(src, this.usernames))
-    }).then(results => {
-      console.log(require('util').inspect(results, { depth: null }));
-      return results
     })
   }
 

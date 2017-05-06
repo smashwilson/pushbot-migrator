@@ -168,12 +168,14 @@ class ToDocumentSet {
   }
 
   store(documents) {
+    this.log(`Inserting ${documents.length} documents.`)
     const bodies = documents.map(document => ({body: document.body, submitter: 'migrated'}))
     const dIns = pg.helpers.insert(bodies, this.dcs) + 'RETURNING id'
 
-    return this.db.many(dIns).then(ids => {
+    return this.db.many(dIns).then(rows => {
       const attributes = []
-      ids.forEach((id, index) => {
+      rows.forEach((row, index) => {
+        const id = row.id
         const document = documents[index]
         for (const speaker of document.speakers) {
           attributes.push({
@@ -189,7 +191,7 @@ class ToDocumentSet {
             value: mention
           })
         }
-        for (const subject of document.subject) {
+        for (const subject of document.subjects) {
           attributes.push({
             document_id: id,
             kind: 'subject',
@@ -197,6 +199,7 @@ class ToDocumentSet {
           })
         }
       })
+      this.log(`Inserting ${attributes.length} attributes.`)
 
       const aIns = pg.helpers.insert(attributes, this.acs)
       return this.db.none(aIns)
