@@ -16,13 +16,14 @@ class Context {
     this.limit = limit
 
     this.db = pg(connections.pg)
+    this.roster = JSON.parse(fs.readFileSync(path.join(__dirname, 'roster.json')))
 
     this.fromBrain = new FromBrain(connections.redis)
     this.fromForwardMarkov = new FromMarkov(connections.redis, 'markov')
     this.fromReverseMarkov = new FromMarkov(connections.redis, 'remarkov')
 
-    this.fromQuoteFile = new FromQuotefile(path.join(__dirname, 'bundle', 'quotes'), /\n\n/, parseQuote)
-    this.fromLimFile = new FromQuotefile(path.join(__dirname, 'bundle', 'lims.txt'), /\n--\n/, parseLim)
+    this.fromQuoteFile = new FromQuotefile(path.join(__dirname, 'bundle', 'quotes'), /\n\n/, parseQuote, this.roster)
+    this.fromLimFile = new FromQuotefile(path.join(__dirname, 'bundle', 'lim.txt'), /\n---\n/, parseLim, this.roster)
 
     this.toBrain = new ToBrain(this.db)
     this.toForwardMarkov = new ToMarkov(this.db, 'markov')

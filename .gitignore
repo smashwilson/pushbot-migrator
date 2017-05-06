@@ -84,5 +84,6 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
+roster.json
 secrets.sh
 bundle.tar.gz
