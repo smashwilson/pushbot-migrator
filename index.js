@@ -7,8 +7,13 @@ const pg = require('pg-promise')({
 const {FromBrain, FromMarkov} = require('./src/from-redis')
 const {FromQuotefile, parseQuote, parseLim} = require('./src/from-quotefile')
 const {ToBrain, ToMarkov} = require('./src/to-pg')
+const fs = require('fs')
 const path = require('path')
 const util = require('util')
+
+const BRAIN = Symbol('brain')
+const MARKOV = Symbol('markov')
+const QUOTE = Symbol('quote')
 
 class Context {
 
@@ -30,12 +35,24 @@ class Context {
     this.toReverseMarkov = new ToMarkov(this.db, 'remarkov')
   }
 
+  isActive(kind) {
+    return this.active.has(kind)
+  }
+
   prepare() {
-    return Promise.all([
-      this.toBrain.prepare(),
+    const tasks = []
+
+    this.isActive(BRAIN) && tasks.push(this.toBrain.prepare())
+    this.isActive(MARKOV) && tasks.push(
       this.toForwardMarkov.prepare(),
-      this.toReverseMarkov.prepare(),
-    ])
+      this.toReverseMarkov.prepare()
+    )
+    this.isActive(QUOTE) && tasks.push(
+      this.toQuoteSet.prepare(),
+      this.toLimSet.prepare()
+    )
+
+    return Promise.all(tasks)
   }
 
   transfer() {
@@ -54,13 +71,17 @@ class Context {
 
     return Promise.all([
       transferBrain(),
+    const tasks = []
+    this.isActive(BRAIN) && tasks.push(transferBrain())
+    this.isActive(MARKOV) && tasks.push(
       transferForwardModel(),
-      transferReverseModel(),
-    ])
+      transferReverseModel()
+    )
+    return Promise.all(tasks)
   }
 
   dump() {
-    return this.fromBrain.load().then((storage) => {
+    const dumpBrain = () => this.fromBrain.load().then((storage) => {
       let processed = {}
       if (this.limit !== undefined) {
         let count = 0
@@ -81,9 +102,12 @@ class Context {
         processed = storage
       }
 
-      const output = util.inspect(processed, { maxArrayLength: 5 })
+      const output = util.inspect(processed)
       console.log(`BRAIN:\n${output}`)
     })
+    let result = Promise.resolve()
+    this.isActive(BRAIN) && (result = result.then(dumpBrain))
+    return result
   }
 
   end() {
@@ -92,9 +116,12 @@ class Context {
 
 }
 
-function initialize(connections, limit) {
-  const context = new Context(connections, limit)
+function initialize(connections, limit, active) {
+  const context = new Context(connections, limit, active)
   return context.prepare().then(() => context)
 }
 
 exports.initialize = initialize
+exports.BRAIN = BRAIN
+exports.MARKOV = MARKOV
+exports.QUOTE = QUOTE
