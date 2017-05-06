@@ -13,7 +13,7 @@ function parseQuote(src, usernames) {
     if (m) {
       speakers.add(m[1])
 
-      for (const mention of m[2].match(usernameRx)) {
+      for (const mention of m[2].match(usernameRx) || []) {
         mentions.add(mention)
       }
     }
@@ -22,7 +22,8 @@ function parseQuote(src, usernames) {
   return {
     body: src,
     speakers: Array.from(speakers),
-    mentions: Array.from(mentions)
+    mentions: Array.from(mentions),
+    subjects: []
   }
 }
 
@@ -34,16 +35,18 @@ function parseLim(src, usernames) {
   return {
     body: src,
     speakers: finalLine.match(usernameRx),
-    mentions: []
+    mentions: [],
+    subjects: []
   }
 }
 
 class FromQuotefile {
 
-  constructor(filePath, separator, parser) {
+  constructor(filePath, separator, parser, usernames) {
     this.filePath = filePath
     this.separator = separator
     this.parser = parser
+    this.usernames = usernames
   }
 
   load() {
@@ -51,7 +54,10 @@ class FromQuotefile {
     .then(contents => {
       return contents.split(this.separator)
         .filter(quote => quote.length > 1)
-        .map(src => this.parser(src))
+        .map(src => this.parser(src, this.usernames))
+    }).then(results => {
+      console.log(require('util').inspect(results, { depth: null }));
+      return results
     })
   }
 
