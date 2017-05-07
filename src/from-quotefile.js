@@ -2,8 +2,9 @@
 
 const Promise = require('bluebird')
 const fs = require('fs-promise')
+const path = require('path')
 
-function parseQuote(src, usernames) {
+function parseQuote(src, usernames, aliases) {
   const speakers = new Set()
   const mentions = new Set()
 
@@ -27,17 +28,33 @@ function parseQuote(src, usernames) {
   }
 }
 
-function parseLim(src, usernames) {
+function parseLim(src, usernames, aliases) {
   const lines = src.split(/\n/)
-  const finalLine = lines[lines.length - 1]
+  let bodyLines = lines.slice(0, lines.length - 1)
+  let finalLine = lines[lines.length - 1]
 
-  const usernameRx = new RegExp(usernames.join('|'), 'ig')
-  return {
-    body: src,
-    speakers: finalLine.match(usernameRx) || [],
-    mentions: [],
-    subjects: []
+  let speakers = [];
+  if (/^\s*-/.test(finalLine)) {
+    const allNames = usernames.slice()
+    allNames.push(...aliases.keys())
+
+    const usernameRx = new RegExp(allNames.join('|'), 'ig')
+    speakers = (finalLine.match(usernameRx) || [])
+      .map(speaker => speaker.toLowerCase())
+      .map(speaker => aliases.get(speaker) || speaker)
+      .filter(speaker => speaker !== 'pushbot')
+  } else {
+    bodyLines = lines
+    finalLine = '  - _anonymous_'
   }
+
+  const body = bodyLines.map(line => `> ${line}`).join('\n') + '\n\n' + finalLine
+
+  if (speakers.length === 0) {
+    console.log(require('util').inspect({src}, { depth: null }));
+  }
+
+  return {body, speakers, mentions: [], subjects: []}
 }
 
 class FromQuotefile {
@@ -50,11 +67,21 @@ class FromQuotefile {
   }
 
   load() {
-    return fs.readFile(this.filePath, {encoding: 'utf8'})
+    let aliases = new Map()
+
+    return fs.readFile(path.join(__dirname, '..', 'aliases.json'), {encoding: 'utf8'})
+    .then(contents => {
+      const aliasData = JSON.parse(contents)
+      for (const alias in aliasData) {
+        aliases.set(alias, aliasData[alias])
+      }
+
+      return fs.readFile(this.filePath, {encoding: 'utf8'})
+    })
     .then(contents => {
       return contents.split(this.separator)
         .filter(quote => quote.length > 1)
-        .map(src => this.parser(src, this.usernames))
+        .map(src => this.parser(src, this.usernames, aliases))
     })
   }
 

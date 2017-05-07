@@ -85,5 +85,6 @@ $RECYCLE.BIN/
 *.lnk
 
 roster.json
+aliases.json
 secrets.sh
 bundle.tar.gz
