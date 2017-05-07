@@ -50,10 +50,6 @@ function parseLim(src, usernames, aliases) {
 
   const body = bodyLines.map(line => `> ${line}`).join('\n') + '\n\n' + finalLine
 
-  if (speakers.length === 0) {
-    console.log(require('util').inspect({src}, { depth: null }));
-  }
-
   return {body, speakers, mentions: [], subjects: []}
 }
 
