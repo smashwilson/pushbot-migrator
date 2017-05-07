@@ -83,6 +83,7 @@ if [ "${1:-}" = "reset" ]; then
   wait_for_postgres
 fi
 
-exec node cli.js \
+time node cli.js \
   --pg postgres://${PG_USER}:${PG_PASS}@${PG_ADDR}:5432/pushbot \
+  --brain --markov --quote --mapping \
   --transfer
