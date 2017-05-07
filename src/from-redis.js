@@ -65,7 +65,7 @@ class FromMarkov {
         marker = next
         return Promise.all(batch.map(transitionsFromKey))
       }).then(() => {
-        if (marker !== 0) return loop()
+        if (marker !== '0') return loop()
       })
     }
     return loop().then(() => batch.length > 0 && callback(batch))
