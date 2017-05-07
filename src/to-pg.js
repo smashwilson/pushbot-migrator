@@ -168,6 +168,11 @@ class ToDocumentSet {
   }
 
   store(documents) {
+    if (documents.length === 0) {
+      this.log('No documents to insert.')
+      return Promise.resolve()
+    }
+
     this.log(`Inserting ${documents.length} documents.`)
     const bodies = documents.map(document => ({body: document.body, submitter: 'migrated'}))
     const dIns = pg.helpers.insert(bodies, this.dcs) + 'RETURNING id'

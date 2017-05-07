@@ -5,7 +5,7 @@ const pg = require('pg-promise')({
   promiseLib: Promise
 })
 const {FromBrain, FromMarkov} = require('./src/from-redis')
-const {FromQuotefile, parseQuote, parseLim} = require('./src/from-quotefile')
+const {FromQuotefile, FromMappingFile, parseQuote, parseLim} = require('./src/from-quotefile')
 const {ToBrain, ToMarkov, ToDocumentSet} = require('./src/to-pg')
 const fs = require('fs')
 const path = require('path')
@@ -14,6 +14,7 @@ const util = require('util')
 const BRAIN = Symbol('brain')
 const MARKOV = Symbol('markov')
 const QUOTE = Symbol('quote')
+const MAPPING = Symbol('mapping')
 
 class Context {
 
@@ -36,6 +37,18 @@ class Context {
     this.toReverseMarkov = new ToMarkov(this.db, 'remarkov')
     this.toQuoteSet = new ToDocumentSet(this.db, 'quote')
     this.toLimSet = new ToDocumentSet(this.db, 'lim')
+
+    this.mappings = fs.readdirSync(path.join(__dirname, 'bundle', 'mappings'))
+      .filter(fileName => /\.json$/.test(fileName))
+      .map(mappingFile => {
+        const fullPath = path.join(__dirname, 'bundle', 'mappings', mappingFile)
+        const mappingName = path.basename(mappingFile, '.json')
+
+        return {
+          from: new FromMappingFile(fullPath),
+          to: new ToDocumentSet(this.db, mappingName)
+        }
+      })
   }
 
   isActive(kind) {
@@ -53,6 +66,9 @@ class Context {
     this.isActive(QUOTE) && tasks.push(
       this.toQuoteSet.prepare(),
       this.toLimSet.prepare()
+    )
+    this.isActive(MAPPING) && tasks.push(
+      ...this.mappings.map(({to}) => to.prepare())
     )
 
     return Promise.all(tasks)
@@ -80,6 +96,24 @@ class Context {
 
     const transferLimFile = transferDocFile.bind(this, this.fromLimFile, this.toLimSet)
 
+    const transferMappings = () => {
+      return Promise.all(
+        this.mappings.map(({from, to}) => {
+          return from.load().then(mappingData => {
+            const documents = Object.keys(mappingData).map(username => {
+              return {
+                body: mappingData[username],
+                subjects: [username],
+                mentions: [],
+                speakers: []
+              }
+            })
+            return to.store(documents)
+          })
+        })
+      )
+    }
+
     const tasks = []
     this.isActive(BRAIN) && tasks.push(transferBrain())
     this.isActive(MARKOV) && tasks.push(
@@ -90,6 +124,8 @@ class Context {
       transferQuoteFile(),
       transferLimFile()
     )
+    this.isActive(MAPPING) && tasks.push(transferMappings())
+
     return Promise.all(tasks)
   }
 
@@ -164,3 +200,4 @@ exports.initialize = initialize
 exports.BRAIN = BRAIN
 exports.MARKOV = MARKOV
 exports.QUOTE = QUOTE
+exports.MAPPING = MAPPING

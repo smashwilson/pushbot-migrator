@@ -60,7 +60,28 @@ class FromQuotefile {
 
 }
 
+class FromMappingFile {
+
+  constructor(filePath) {
+    this.filePath = filePath
+  }
+
+  load() {
+    return fs.readFile(this.filePath, {encoding: 'utf8'})
+    .then(contents => {
+      try {
+        return JSON.parse(contents)
+      } catch (e) {
+        console.error(e)
+        return {}
+      }
+    })
+  }
+
+}
+
 exports.parseQuote = parseQuote
 exports.parseLim = parseLim
 
 exports.FromQuotefile = FromQuotefile
+exports.FromMappingFile = FromMappingFile
