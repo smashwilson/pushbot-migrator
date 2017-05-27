@@ -46,7 +46,11 @@ class FromMarkov {
         if (!/\d+/.test(sizePrefix)) throw new Error(`Invalid prefix: ${sizePrefix}`);
         if (parseInt(sizePrefix) === encodedFrom.length - i) break;
       }
-      const from = encodedFrom.slice(i)
+
+      let from = encodedFrom.slice(i)
+      if (from === '') {
+        from = ' '
+      }
 
       return this.client.hgetallAsync(key).then(result => {
         const transitions = Object.keys(result).map(to => ({from, to, frequency: result[to]}))
