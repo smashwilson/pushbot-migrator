@@ -33,8 +33,8 @@ class Context {
     this.fromLimFile = new FromQuotefile(path.join(__dirname, 'bundle', 'lim.txt'), /\n---\n/, parseLim, this.roster)
 
     this.toBrain = new ToBrain(this.db)
-    this.toForwardMarkov = new ToMarkov(this.db, 'markov')
-    this.toReverseMarkov = new ToMarkov(this.db, 'remarkov')
+    this.toForwardMarkov = new ToMarkov(this.db, 'default_forward')
+    this.toReverseMarkov = new ToMarkov(this.db, 'default_reverse')
     this.toQuoteSet = new ToDocumentSet(this.db, 'quote')
     this.toLimSet = new ToDocumentSet(this.db, 'lim')
 
